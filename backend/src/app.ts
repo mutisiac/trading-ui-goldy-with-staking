@@ -1,99 +1,70 @@
 import express from "express";
 import type { Express } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import connectDB from "./DB/connect.DB.js";
-import multerErrorHandler from "./Utils/multerError.Utils.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import startCleanupScheduler from "./Jobs/cleanupScheduler.job.js";
-import { loginLimiter } from "./Middlewares/rateLimiter.Middleware.js";
-import { startCleanupJob } from "./Jobs/cleanupJob.js";
+import { env } from "./config/env.js";
+import { multerErrorHandler } from "./utils/upload.utils.js";
+import { loginLimiter } from "./middleware/rate-limiter.middleware.js";
+import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
+
+import authRoutes from "./routes/auth.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import transactionRoutes from "./routes/transaction.routes.js";
+import newsRoutes from "./routes/news.routes.js";
+import campaignRoutes from "./routes/campaign.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+import complaintRoutes from "./routes/complaint.routes.js";
+import supportRoutes from "./routes/support.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: "./.env" });
-const PORT: number = parseInt(process.env.PORT || "3000", 10);
-if (isNaN(PORT)) {
-  console.error("🔴 PORT environment variable is not a valid number. Exiting.");
-  process.exit(1);
-}
-const app: Express = express();
+export function createApp(): Express {
+  const app = express();
 
-// --- Middlewares ---
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true,
-  })
-);
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    console.log(
-      `[API] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
-    );
-  });
-  next();
-});
-app.use(express.json({ limit: "16kb" }));
-app.use(express.urlencoded({ extended: true, limit: "16kb" }));
-app.use(express.static("public"));
-app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
-app.use(multerErrorHandler);
-app.use(cookieParser());
-app.use(loginLimiter);
+  const corsOrigin = env.CORS_ORIGIN?.trim();
+  app.use(
+    cors({
+      origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true,
+      credentials: true,
+    })
+  );
 
-// Routes
-import authRoutes from "./Routes/auth.Routes.js";
-import userRoutes from "./Routes/user.routes.js";
-import transactionRoutes from "./Routes/transaction.Routes.js";
-import newsRoutes from "./Routes/news.Routes.js";
-import campaignRoutes from "./Routes/campaign.routes.js";
-import dashboardRoutes from "./Routes/dashboard.Routes.js";
-import complaintRoutes from "./Routes/complaint.Routes.js";
-import supportRoutes from "./Routes/support.route.js";
-
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/transaction", transactionRoutes);
-app.use("/api/news", newsRoutes);
-app.use("/api/campaigns", campaignRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/complaints", complaintRoutes);
-app.use("/api/support", supportRoutes);
-
-// Start Cleanup Scheduler
-startCleanupScheduler();
-
-// --- Database Connection and Server Initialization ---
-const startServer = async () => {
-  try {
-    await connectDB();
-    console.log("🟢 MongoDB connected successfully!");
-    const server = app.listen(PORT, () => {
-      console.log(`⚡️[server]: Server is running at http://localhost:${PORT}`);
-      // Start cleanup job here
-      startCleanupJob();
-    });
-    server.on("error", (error: Error) => {
-      console.error(`🔴 Server emitted an error:`, error);
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("🔴 Failed to connect to MongoDB:", error.message);
-    } else {
-      console.error(
-        "🔴 An unknown error occurred during DB connection:",
-        error
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      console.log(
+        `[API] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
       );
-    }
-    process.exit(1);
-  }
-};
+    });
+    next();
+  });
 
-startServer();
+  app.use(express.json({ limit: "16kb" }));
+  app.use(express.urlencoded({ extended: true, limit: "16kb" }));
+  app.use(express.static(path.join(__dirname, "..", "public")));
+  app.use(
+    "/uploads",
+    express.static(path.join(__dirname, "..", "public", "uploads"))
+  );
+  app.use(cookieParser());
+  app.use(loginLimiter);
+
+  app.use("/api/auth", authRoutes);
+  app.use("/api/user", userRoutes);
+  app.use("/api/transaction", transactionRoutes);
+  app.use("/api/news", newsRoutes);
+  app.use("/api/campaigns", campaignRoutes);
+  app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/complaints", complaintRoutes);
+  app.use("/api/support", supportRoutes);
+
+  app.use(multerErrorHandler);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+}

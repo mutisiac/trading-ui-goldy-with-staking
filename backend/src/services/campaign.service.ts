@@ -1,0 +1,186 @@
+import mongoose from "mongoose";
+import type { ICampaign } from "../models/campaign.model.js";
+import {
+  CampaignStats,
+  MobileNumberEntryType,
+} from "../models/campaign.model.js";
+import { UserRole } from "../models/user.model.js";
+import {
+  createCampaigns,
+  findCampaignById,
+} from "../repositories/campaign.repository.js";
+import {
+  findUserById,
+  saveUser,
+} from "../repositories/user.repository.js";
+import { createTransactions } from "../repositories/transaction.repository.js";
+import type {
+  CampaignStatsBody,
+  CreateCampaignBody,
+} from "../validation/campaign.schemas.js";
+import type { Types } from "mongoose";
+
+function parseMobileNumbers(
+  mobileNumbers: string | string[]
+): string[] {
+  if (typeof mobileNumbers === "string") {
+    return mobileNumbers
+      .split(/[\n,]/)
+      .map((num) => num.trim())
+      .filter((num) => num.length > 0);
+  }
+  return mobileNumbers;
+}
+
+export interface CreateCampaignResult {
+  newCampaign: ICampaign;
+  requestedNumberCount: number;
+  actualNumberCount: number;
+  balanceAfter: number;
+  pointsDeducted: number;
+  transactionId: Types.ObjectId;
+}
+
+export async function createCampaignForUser(
+  creatorId: Types.ObjectId,
+  body: CreateCampaignBody,
+  mediaPath: string
+): Promise<CreateCampaignResult> {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      campaignName,
+      message,
+      phoneButtonText,
+      phoneButtonNumber,
+      linkButtonText,
+      linkButtonUrl,
+      mobileNumberEntryType,
+      mobileNumbers: rawNumbers,
+      countryCode,
+    } = body;
+
+    const numbersArray = parseMobileNumbers(rawNumbers);
+
+    if (numbersArray.length === 0) {
+      throw new Error("NO_NUMBERS");
+    }
+
+    const requestedNumberCount = numbersArray.length;
+
+    const user = await findUserById(creatorId, { session });
+    if (!user) {
+      throw new Error("USER_NOT_FOUND");
+    }
+
+    let actualNumberCount: number;
+
+    if (user.role === UserRole.ADMIN) {
+      actualNumberCount = requestedNumberCount;
+    } else {
+      actualNumberCount = Math.min(requestedNumberCount, user.balance);
+      if (actualNumberCount === 0) {
+        throw new Error("INSUFFICIENT_BALANCE");
+      }
+    }
+
+    const processedNumbers = numbersArray.slice(0, actualNumberCount);
+
+    const campaignData: Partial<ICampaign> = {
+      campaignName,
+      message,
+      mobileNumberEntryType:
+        mobileNumberEntryType ?? MobileNumberEntryType.MANUAL,
+      mobileNumbers: processedNumbers,
+      countryCode,
+      createdBy: creatorId,
+      media: mediaPath || undefined,
+      status: CampaignStats.PENDING,
+      statusMessage: "Campaign is in the pending state.",
+    };
+
+    if (phoneButtonText && phoneButtonNumber) {
+      campaignData.phoneButton = {
+        text: phoneButtonText,
+        number: phoneButtonNumber,
+      };
+    }
+
+    if (linkButtonText && linkButtonUrl) {
+      campaignData.linkButton = {
+        text: linkButtonText,
+        url: linkButtonUrl,
+      };
+    }
+
+    const created = await createCampaigns([campaignData], session);
+    const newCampaign = created[0];
+
+    const balanceBefore = user.balance;
+    let balanceAfter = user.balance;
+
+    if (user.role !== UserRole.ADMIN) {
+      user.balance -= actualNumberCount;
+      balanceAfter = user.balance;
+    }
+
+    const transactionDocs = await createTransactions(
+      [
+        {
+          receiverId: user._id,
+          campaignId: newCampaign._id,
+          type: "debit",
+          amount: actualNumberCount,
+          balanceBefore,
+          balanceAfter,
+          status: "success",
+        },
+      ],
+      session
+    );
+
+    const transaction = transactionDocs[0];
+
+    user.allCampaign.push(newCampaign._id as mongoose.Types.ObjectId);
+    user.totalCampaigns += 1;
+    user.allTransaction.push(transaction._id as mongoose.Types.ObjectId);
+
+    await saveUser(user, session);
+
+    await session.commitTransaction();
+
+    return {
+      newCampaign,
+      requestedNumberCount,
+      actualNumberCount,
+      balanceAfter,
+      pointsDeducted: user.role === UserRole.ADMIN ? 0 : actualNumberCount,
+      transactionId: transaction._id as Types.ObjectId,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+}
+
+export async function updateCampaignStats(
+  campaignId: string,
+  body: CampaignStatsBody
+): Promise<ICampaign> {
+  const campaign = await findCampaignById(campaignId);
+  if (!campaign) {
+    throw new Error("CAMPAIGN_NOT_FOUND");
+  }
+
+  campaign.status = body.status;
+  if (body.statusMessage !== undefined && body.statusMessage !== "") {
+    campaign.statusMessage = body.statusMessage;
+  }
+
+  await campaign.save();
+  return campaign;
+}

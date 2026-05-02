@@ -29,6 +29,16 @@ app.use(
     credentials: true,
   })
 );
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    console.log(
+      `[API] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
+    );
+  });
+  next();
+});
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getUserRole } from "../utils/Auth";
 import { UserRole } from "../constants/Roles";
+import { api } from "../api/client";
 
 interface Complaint {
   complaintId: string;
@@ -72,7 +73,6 @@ const Complaints = () => {
   );
   const [actionLoading, setActionLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL;
   const userRole = getUserRole();
   const isAdmin = userRole === UserRole.ADMIN;
 
@@ -94,17 +94,13 @@ const Complaints = () => {
   const fetchComplaintsData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/complaints`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: ComplaintsData;
+      }>("/api/dashboard/complaints");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setComplaintsData(result.data);
       } else {
         setError(result.message || "Failed to load complaints data");
@@ -115,7 +111,7 @@ const Complaints = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchComplaintsData();
@@ -173,18 +169,12 @@ const Complaints = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/complaints/create`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createFormData),
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/complaints/create", createFormData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("Complaint created successfully!");
         setShowCreateModal(false);
         setCreateFormData({ subject: "", description: "" });
@@ -208,21 +198,15 @@ const Complaints = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/complaints/update/${selectedComplaint.complaintId}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(editFormData),
-        }
+      const { data: result } = await api.put<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/complaints/update/${selectedComplaint.complaintId}`,
+        editFormData
       );
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("Complaint updated successfully!");
         setShowEditModal(false);
         setSelectedComplaint(null);
@@ -247,17 +231,14 @@ const Complaints = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/complaints/delete/${selectedComplaint.complaintId}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
+      const { data: result } = await api.delete<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/complaints/delete/${selectedComplaint.complaintId}`
       );
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("Complaint deleted successfully!");
         setShowDeleteModal(false);
         setSelectedComplaint(null);

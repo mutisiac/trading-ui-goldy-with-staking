@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { getUserRole } from "../utils/Auth";
 import { UserRole } from "../constants/Roles";
+import { api } from "../api/client";
 
 interface NewsItem {
   id: string;
@@ -54,7 +55,6 @@ const News = () => {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
   const userRole = getUserRole();
   const isAdmin = userRole === UserRole.ADMIN;
 
@@ -62,17 +62,13 @@ const News = () => {
   const fetchNewsData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/news`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: NewsData;
+      }>("/api/dashboard/news");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setNewsData(result.data);
       } else {
         setError(result.message || "Failed to load news data");
@@ -83,7 +79,7 @@ const News = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchNewsData();
@@ -120,18 +116,12 @@ const News = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/news/create`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/news/create", formData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("News created successfully!");
         setShowCreateModal(false);
         setFormData({ title: "", description: "", status: "ACTIVE" });
@@ -158,21 +148,12 @@ const News = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/news/update/${selectedNews.id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      );
+      const { data: result } = await api.put<{
+        success: boolean;
+        message?: string;
+      }>(`/api/news/update/${selectedNews.id}`, formData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("News updated successfully!");
         setShowEditModal(false);
         setSelectedNews(null);
@@ -197,17 +178,12 @@ const News = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/news/delete/${selectedNews.id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
+      const { data: result } = await api.delete<{
+        success: boolean;
+        message?: string;
+      }>(`/api/news/delete/${selectedNews.id}`);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("News deleted successfully!");
         setShowDeleteModal(false);
         setSelectedNews(null);

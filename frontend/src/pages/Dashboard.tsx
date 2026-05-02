@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getUserRole } from "../utils/Auth";
 import { UserRole } from "../constants/Roles";
+import { api } from "../api/client";
 
 interface DashboardData {
   companyName: string;
@@ -60,7 +61,6 @@ const Dashboard = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [chartHeight, setChartHeight] = useState(400);
 
-  const API_URL = import.meta.env.VITE_API_URL;
   const userRole = getUserRole();
 
   // Dynamic chart height based on screen size
@@ -85,17 +85,13 @@ const Dashboard = () => {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/home`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: DashboardData;
+      }>("/api/dashboard/home");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setDashboardData(result.data);
       } else {
         setError(result.message || "Failed to load dashboard data");
@@ -106,7 +102,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Menu, X } from 'lucide-react';
+import { api } from '../../api/client';
 
 interface UserData {
   _id: string;
@@ -32,20 +33,13 @@ const Header = ({ onToggleSidebar, isSidebarOpen }: HeaderProps) => {
   }, []);
 
   const handleLogout = async () => {
-    const API_URL = import.meta.env.VITE_API_URL;
-
     try {
-      await fetch(`${API_URL}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await api.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
       navigate('/');
     }
   };

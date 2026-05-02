@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { X, Plus, Eye, Edit2, DollarSign, Minus, Lock, Unlock, Trash2 } from 'lucide-react';
 import { getUserRole } from '../utils/Auth';
 import { UserRole } from '../constants/Roles';
+import { api } from '../api/client';
 
 interface User {
   id: string;
@@ -70,7 +71,6 @@ const ManageUser = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const userRole = getUserRole();
   const isAdminOrReseller = userRole === UserRole.ADMIN || userRole === UserRole.RESELLER;
 
@@ -78,17 +78,13 @@ const ManageUser = () => {
   const fetchUsersData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/manage-user`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: UsersData;
+      }>('/api/dashboard/manage-user');
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setUsersData(result.data);
       } else {
         setError(result.message || 'Failed to load users data');
@@ -99,7 +95,7 @@ const ManageUser = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchUsersData();
@@ -158,15 +154,12 @@ const ManageUser = () => {
         formData.append('image', createFormData.image);
       }
 
-      const response = await fetch(`${API_URL}/api/user/create`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>('/api/user/create', formData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(`${createFormData.role === 'reseller' ? 'Reseller' : 'User'} created successfully!`);
         setShowCreateModal(false);
         setCreateFormData({
@@ -234,18 +227,12 @@ const ManageUser = () => {
         if (editFormData.email) profileData.email = editFormData.email;
         if (editFormData.number) profileData.number = editFormData.number;
 
-        const profileResponse = await fetch(`${API_URL}/api/user/update/${selectedUser.id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(profileData),
-        });
+        const { data: profileResult } = await api.put<{
+          success: boolean;
+          message?: string;
+        }>(`/api/user/update/${selectedUser.id}`, profileData);
 
-        const profileResult = await profileResponse.json();
-
-        if (profileResponse.ok && profileResult.success) {
+        if (profileResult.success) {
           profileSuccess = true;
         } else {
           setError(profileResult.message || 'Failed to update profile');
@@ -256,21 +243,15 @@ const ManageUser = () => {
 
       // Update password if fields provided
       if (hasPasswordUpdate) {
-        const passwordResponse = await fetch(`${API_URL}/api/user/change-password/${selectedUser.id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            password: editFormData.password,
-            confirmPassword: editFormData.confirmPassword
-          }),
+        const { data: passwordResult } = await api.put<{
+          success: boolean;
+          message?: string;
+        }>(`/api/user/change-password/${selectedUser.id}`, {
+          password: editFormData.password,
+          confirmPassword: editFormData.confirmPassword
         });
 
-        const passwordResult = await passwordResponse.json();
-
-        if (passwordResponse.ok && passwordResult.success) {
+        if (passwordResult.success) {
           passwordSuccess = true;
         } else {
           setError(passwordResult.message || 'Failed to change password');
@@ -312,21 +293,15 @@ const ManageUser = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/transaction/credit`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          receiverId: selectedUser.id,
-          amount: parseFloat(creditAmount)
-        }),
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>('/api/transaction/credit', {
+        receiverId: selectedUser.id,
+        amount: parseFloat(creditAmount)
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(`₹${creditAmount} credited successfully!`);
         setShowAddCreditModal(false);
         setSelectedUser(null);
@@ -354,21 +329,15 @@ const ManageUser = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/transaction/debit`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: selectedUser.id,
-          amount: parseFloat(debitAmount)
-        }),
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>('/api/transaction/debit', {
+        userId: selectedUser.id,
+        amount: parseFloat(debitAmount)
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(`₹${debitAmount} debited successfully!`);
         setShowRemoveCreditModal(false);
         setSelectedUser(null);
@@ -395,15 +364,13 @@ const ManageUser = () => {
     const endpoint = selectedUser.status === 'active' ? 'freeze' : 'unfreeze';
 
     try {
-      const response = await fetch(`${API_URL}/api/user/${endpoint}/${selectedUser.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-      });
+      const { data: result } = await api.put<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/${endpoint}/${selectedUser.id}`);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setSuccess(result.message);
+      if (result.success) {
+        setSuccess(result.message ?? "");
         setShowFreezeModal(false);
         setSelectedUser(null);
         fetchUsersData();
@@ -426,14 +393,12 @@ const ManageUser = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/user/delete/${selectedUser.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const { data: result } = await api.delete<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/delete/${selectedUser.id}`);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess('User deleted successfully!');
         setShowDeleteModal(false);
         setSelectedUser(null);

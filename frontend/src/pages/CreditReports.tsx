@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { api } from '../api/client';
 
 interface Transaction {
   transactionId: string;
@@ -29,22 +30,17 @@ const CreditReports = () => {
   const [endDate, setEndDate] = useState('');
   
   const ITEMS_PER_PAGE = 10;
-  const API_URL = import.meta.env.VITE_API_URL;
 
   const fetchTransactionData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/transaction`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: TransactionData;
+      }>('/api/dashboard/transaction');
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setTransactionData(result.data);
       } else {
         setError(result.message || 'Failed to load transaction data');
@@ -55,7 +51,7 @@ const CreditReports = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchTransactionData();

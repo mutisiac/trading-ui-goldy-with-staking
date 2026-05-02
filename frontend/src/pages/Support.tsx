@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
+import { api } from "../api/client";
 
 interface CreatorData {
   companyName: string;
@@ -39,24 +40,18 @@ const Support = () => {
   const [formSuccess, setFormSuccess] = useState("");
   const [formError, setFormError] = useState("");
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   // Fetch creator/support data
   useEffect(() => {
     const fetchSupportData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/api/dashboard/support`, {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+        const { data: result } = await api.get<{
+          success: boolean;
+          message?: string;
+          data: CreatorData;
+        }>("/api/dashboard/support");
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result.success) {
           setCreatorData(result.data);
         } else {
           setError(result.message || "Failed to load support information");
@@ -70,7 +65,7 @@ const Support = () => {
     };
 
     fetchSupportData();
-  }, [API_URL]);
+  }, []);
 
   // Handle Support Form Change
   const handleSupportFormChange = (
@@ -90,18 +85,12 @@ const Support = () => {
     setFormError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/support`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(supportForm),
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/support", supportForm);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setFormSuccess(
           result.message ||
             "Your message has been sent successfully! We will get back to you soon."

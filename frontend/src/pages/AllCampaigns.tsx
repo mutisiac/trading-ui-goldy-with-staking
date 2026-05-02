@@ -14,6 +14,7 @@ import {
 import toast from "react-hot-toast";
 import { UserRole } from "../constants/Roles";
 import { getUserRole } from "../utils/Auth";
+import { api } from "../api/client";
 const userRole = getUserRole();
 
 
@@ -76,23 +77,13 @@ const AllCampaigns = () => {
   const [updateMessage, setUpdateMessage] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   // Fetch all campaigns data
   const fetchReportsData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/all-campaigns`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get("/api/dashboard/all-campaigns");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setReportsData(result.data);
       } else {
         setError(result.message || "Failed to load campaigns data");
@@ -103,7 +94,7 @@ const AllCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchReportsData();
@@ -117,34 +108,39 @@ const AllCampaigns = () => {
       setDownloadingCampaigns((prev) => new Set(prev).add(campaignId));
       setDownloadError(null);
 
-      const response = await fetch(
-        `${API_URL}/api/dashboard/export-campaign/${campaignId}`,
+      const response = await api.get(
+        `/api/dashboard/export-campaign/${campaignId}`,
         {
-          method: "GET",
-          credentials: "include",
+          responseType: "blob",
+          validateStatus: () => true,
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || "Failed to download campaign data"
-        );
+      if (response.status >= 400) {
+        let msg = "Failed to download campaign data";
+        try {
+          const text = await (response.data as Blob).text();
+          const j = JSON.parse(text) as { message?: string };
+          msg = j.message || msg;
+        } catch {
+          /* non-JSON error body */
+        }
+        throw new Error(msg);
       }
 
-      // Get filename from Content-Disposition header or create default
-      const contentDisposition = response.headers.get("Content-Disposition");
+      const contentDisposition =
+        response.headers["content-disposition"] ||
+        response.headers["Content-Disposition"];
       let filename = `Campaign_${campaignId}.xlsx`;
 
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-        if (filenameMatch && filenameMatch[1]) {
+        if (filenameMatch?.[1]) {
           filename = filenameMatch[1];
         }
       }
 
-      // Create blob and trigger download
-      const blob = await response.blob();
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -177,24 +173,15 @@ const AllCampaigns = () => {
 
     try {
       setUpdatingStatus(true);
-      const response = await fetch(
-        `${API_URL}/api/campaigns/stats/${selectedCampaignForUpdate.campaignId}`,
+      const { data: result } = await api.put(
+        `/api/campaigns/stats/${selectedCampaignForUpdate.campaignId}`,
         {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: updateStatus,
-            statusMessage: updateMessage,
-          }),
+          status: updateStatus,
+          statusMessage: updateMessage,
         }
       );
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         toast.success("Campaign status updated successfully!");
         setShowUpdateStatusModal(false);
         // Refresh campaigns

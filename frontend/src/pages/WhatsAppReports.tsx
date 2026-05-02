@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../api/client";
 
 interface Campaign {
   campaignId: string;
@@ -65,26 +66,13 @@ const WhatsAppReports = () => {
     null
   );
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   // Fetch reports data
   const fetchReportsData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_URL}/api/dashboard/whatsapp-reports`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const { data: result } = await api.get("/api/dashboard/whatsapp-reports");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setReportsData(result.data);
         setUserData(result.userData);
       } else {
@@ -96,7 +84,7 @@ const WhatsAppReports = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchReportsData();
@@ -131,34 +119,39 @@ const WhatsAppReports = () => {
       setDownloadingCampaigns((prev) => new Set(prev).add(campaignId));
       setDownloadError(null);
 
-      const response = await fetch(
-        `${API_URL}/api/dashboard/export-campaign/${campaignId}`,
+      const response = await api.get(
+        `/api/dashboard/export-campaign/${campaignId}`,
         {
-          method: "GET",
-          credentials: "include",
+          responseType: "blob",
+          validateStatus: () => true,
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || "Failed to download campaign data"
-        );
+      if (response.status >= 400) {
+        let msg = "Failed to download campaign data";
+        try {
+          const text = await (response.data as Blob).text();
+          const j = JSON.parse(text) as { message?: string };
+          msg = j.message || msg;
+        } catch {
+          /* non-JSON error body */
+        }
+        throw new Error(msg);
       }
 
-      // Get filename from Content-Disposition header or create default
-      const contentDisposition = response.headers.get("Content-Disposition");
+      const contentDisposition =
+        response.headers["content-disposition"] ||
+        response.headers["Content-Disposition"];
       let filename = `Campaign_${campaignId}.xlsx`;
 
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-        if (filenameMatch && filenameMatch[1]) {
+        if (filenameMatch?.[1]) {
           filename = filenameMatch[1];
         }
       }
 
-      // Create blob and trigger download
-      const blob = await response.blob();
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

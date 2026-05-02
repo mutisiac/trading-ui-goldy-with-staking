@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getUserRole } from "../utils/Auth";
 import { UserRole } from "../constants/Roles";
+import { api } from "../api/client";
 
 interface Reseller {
   id: string;
@@ -84,7 +85,6 @@ const ManageReseller = () => {
   );
   const [actionLoading, setActionLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL;
   const userRole = getUserRole();
   const isAdminOrReseller =
     userRole === UserRole.ADMIN || userRole === UserRole.RESELLER;
@@ -93,17 +93,13 @@ const ManageReseller = () => {
   const fetchResellersData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/manage-reseller`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: ResellersData;
+      }>("/api/dashboard/manage-reseller");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setResellersData(result.data);
       } else {
         setError(result.message || "Failed to load resellers data");
@@ -114,7 +110,7 @@ const ManageReseller = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchResellersData();
@@ -181,15 +177,12 @@ const ManageReseller = () => {
         formData.append("image", createFormData.image);
       }
 
-      const response = await fetch(`${API_URL}/api/user/create`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/user/create", formData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(
           `${
             createFormData.role === "reseller" ? "Reseller" : "User"
@@ -268,21 +261,12 @@ const ManageReseller = () => {
         if (editFormData.email) profileData.email = editFormData.email;
         if (editFormData.number) profileData.number = editFormData.number;
 
-        const profileResponse = await fetch(
-          `${API_URL}/api/user/update/${selectedReseller.id}`,
-          {
-            method: "PUT",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(profileData),
-          }
-        );
+        const { data: profileResult } = await api.put<{
+          success: boolean;
+          message?: string;
+        }>(`/api/user/update/${selectedReseller.id}`, profileData);
 
-        const profileResult = await profileResponse.json();
-
-        if (profileResponse.ok && profileResult.success) {
+        if (profileResult.success) {
           profileSuccess = true;
         } else {
           setError(profileResult.message || "Failed to update profile");
@@ -293,24 +277,15 @@ const ManageReseller = () => {
 
       // Update password if fields provided
       if (hasPasswordUpdate) {
-        const passwordResponse = await fetch(
-          `${API_URL}/api/user/change-password/${selectedReseller.id}`,
-          {
-            method: "PUT",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              password: editFormData.password,
-              confirmPassword: editFormData.confirmPassword,
-            }),
-          }
-        );
+        const { data: passwordResult } = await api.put<{
+          success: boolean;
+          message?: string;
+        }>(`/api/user/change-password/${selectedReseller.id}`, {
+          password: editFormData.password,
+          confirmPassword: editFormData.confirmPassword,
+        });
 
-        const passwordResult = await passwordResponse.json();
-
-        if (passwordResponse.ok && passwordResult.success) {
+        if (passwordResult.success) {
           passwordSuccess = true;
         } else {
           setError(passwordResult.message || "Failed to change password");
@@ -357,21 +332,15 @@ const ManageReseller = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/transaction/credit`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          receiverId: selectedReseller.id,
-          amount: parseFloat(creditAmount),
-        }),
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/transaction/credit", {
+        receiverId: selectedReseller.id,
+        amount: parseFloat(creditAmount),
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(`₹${creditAmount} credited successfully!`);
         setShowAddCreditModal(false);
         setSelectedReseller(null);
@@ -399,21 +368,15 @@ const ManageReseller = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/transaction/debit`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: selectedReseller.id,
-          amount: parseFloat(debitAmount),
-        }),
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+      }>("/api/transaction/debit", {
+        userId: selectedReseller.id,
+        amount: parseFloat(debitAmount),
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess(`₹${debitAmount} debited successfully!`);
         setShowRemoveCreditModal(false);
         setSelectedReseller(null);
@@ -441,18 +404,13 @@ const ManageReseller = () => {
       selectedReseller.status === "active" ? "freeze" : "unfreeze";
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/user/${endpoint}/${selectedReseller.id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-        }
-      );
+      const { data: result } = await api.put<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/${endpoint}/${selectedReseller.id}`);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setSuccess(result.message);
+      if (result.success) {
+        setSuccess(result.message ?? "");
         setShowFreezeModal(false);
         setSelectedReseller(null);
         fetchResellersData();
@@ -475,17 +433,12 @@ const ManageReseller = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/user/delete/${selectedReseller.id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
+      const { data: result } = await api.delete<{
+        success: boolean;
+        message?: string;
+      }>(`/api/user/delete/${selectedReseller.id}`);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("Reseller deleted successfully!");
         setShowDeleteModal(false);
         setSelectedReseller(null);

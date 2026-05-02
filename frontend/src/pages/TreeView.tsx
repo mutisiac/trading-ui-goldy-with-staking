@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { getUserRole } from "../utils/Auth";
 import { UserRole } from "../constants/Roles";
+import { api } from "../api/client";
 
 interface TreeNode {
   id: string;
@@ -38,7 +39,6 @@ const TreeView = () => {
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
   const userRole = getUserRole();
   const isAdminOrReseller =
     userRole === UserRole.ADMIN || userRole === UserRole.RESELLER;
@@ -47,17 +47,13 @@ const TreeView = () => {
   const fetchTreeData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/tree-view`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: TreeData;
+      }>("/api/dashboard/tree-view");
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setTreeData(result.data);
         // Expand root node by default
         if (result.data.tree) {
@@ -72,7 +68,7 @@ const TreeView = () => {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchTreeData();

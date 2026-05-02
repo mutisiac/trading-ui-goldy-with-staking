@@ -1,7 +1,9 @@
 import { useState } from "react";
 import ReactQuill from "react-quill-new";
 import type { FormEvent, ChangeEvent } from "react";
+import axios from "axios";
 import "react-quill-new/dist/quill.snow.css";
+import { api } from "../api/client";
 
 interface FormData {
   campaignName: string;
@@ -204,17 +206,13 @@ const SendWhatsapp = () => {
         submitData.append("image", selectedFile);
       }
 
-      // Send to backend
-      const API_URL = import.meta.env.VITE_API_URL;
-      const response = await fetch(`${API_URL}/api/campaigns`, {
-        method: "POST",
-        body: submitData,
-        credentials: "include",
-      });
+      const { data: result } = await api.post<{
+        success: boolean;
+        message?: string;
+        errors?: string[];
+      }>("/api/campaigns", submitData);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setSuccess("Campaign created successfully!");
         // Reset form
         setFormData({
@@ -241,7 +239,12 @@ const SendWhatsapp = () => {
         setError(backendError);
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const d = err.response.data as { message?: string; errors?: string[] };
+        setError(
+          d.errors?.[0] || d.message || "Failed to create campaign"
+        );
+      } else if (err instanceof Error) {
         setError(err.message);
       } else {
         setError("An unknown error occurred. Please try again.");

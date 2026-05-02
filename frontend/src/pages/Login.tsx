@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Mail, Phone, ArrowLeft, X, AlertCircle } from 'lucide-react';
+import { api } from '../api/client';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -23,18 +25,15 @@ const Login = () => {
     image: null as File | null,
   });
   const navigate = useNavigate();
-  const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const checkBootstrap = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/bootstrap-status`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-        const data = await response.json();
+        const { data } = await api.get<{ success: boolean; hasUsers: boolean }>(
+          '/api/auth/bootstrap-status'
+        );
 
-        if (response.ok && data.success) {
+        if (data.success) {
           setBootstrapAvailable(!data.hasUsers);
         }
       } catch (err) {
@@ -45,7 +44,7 @@ const Login = () => {
     };
 
     checkBootstrap();
-  }, [API_URL]);
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -59,16 +58,14 @@ const Login = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
+      const { data } = await api.post<{
+        success: boolean;
+        message?: string;
+        user?: unknown;
+        token?: string;
+      }>('/api/auth/login', { email, password });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         if (data.user) {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
@@ -84,7 +81,11 @@ const Login = () => {
         }
       }
     } catch (err) {
-      setError('Network error. Please check your connection and try again.');
+      if (axios.isAxiosError(err) && err.response?.data?.message) {
+        setError(String(err.response.data.message));
+      } else {
+        setError('Network error. Please check your connection and try again.');
+      }
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -117,15 +118,14 @@ const Login = () => {
         formData.append('image', bootstrapForm.image);
       }
 
-      const response = await fetch(`${API_URL}/api/auth/bootstrap-admin`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
+      const { data } = await api.post<{
+        success: boolean;
+        message?: string;
+        user?: unknown;
+        token?: string;
+      }>('/api/auth/bootstrap-admin', formData);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         if (data.user) {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
@@ -138,7 +138,11 @@ const Login = () => {
         setBootstrapError(data.message || 'Failed to create admin account.');
       }
     } catch (err) {
-      setBootstrapError('Network error. Please check your connection and try again.');
+      if (axios.isAxiosError(err) && err.response?.data?.message) {
+        setBootstrapError(String(err.response.data.message));
+      } else {
+        setBootstrapError('Network error. Please check your connection and try again.');
+      }
       console.error('Bootstrap error:', err);
     } finally {
       setBootstrapLoading(false);

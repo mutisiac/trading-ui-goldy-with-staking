@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FormEvent, ChangeEvent  } from 'react';
+import axios from 'axios';
+import { api } from '../api/client';
 
 interface BusinessData {
   companyName: string;
@@ -33,8 +35,6 @@ const ManageBusiness = () => {
   const [error, setError] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string>('');
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   const getUserId = (): string | null => {
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
@@ -51,21 +51,22 @@ const ManageBusiness = () => {
   const fetchBusinessDetails = useCallback(async () => {
     try {
       setFetchLoading(true);
-      const response = await fetch(`${API_URL}/api/dashboard/manage-business`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const { data: result } = await api.get<{
+        success: boolean;
+        message?: string;
+        data: {
+          companyName?: string;
+          email?: string;
+          number?: string | number;
+          image?: string;
+        };
+      }>('/api/dashboard/manage-business');
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         const data = {
           companyName: result.data.companyName || '',
           email: result.data.email || '',
-          number: result.data.number || '',
+          number: String(result.data.number ?? ''),
           image: result.data.image || '',
         };
 
@@ -84,7 +85,7 @@ const ManageBusiness = () => {
     } finally {
       setFetchLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchBusinessDetails();
@@ -211,15 +212,18 @@ const ManageBusiness = () => {
         if (profileUpdates.number) profileFormData.append('number', profileUpdates.number);
         if (selectedImage) profileFormData.append('image', selectedImage);
 
-        const profileResponse = await fetch(`${API_URL}/api/auth/update-profile`, {
-          method: 'PUT',
-          credentials: 'include',
-          body: profileFormData,
-        });
+        const { data: profileResult } = await api.put<{
+          success: boolean;
+          message?: string;
+          user: {
+            companyName: string;
+            email: string;
+            number: number;
+            image?: string;
+          };
+        }>('/api/auth/update-profile', profileFormData);
 
-        const profileResult = await profileResponse.json();
-
-        if (profileResponse.ok && profileResult.success) {
+        if (profileResult.success) {
           profileUpdateSuccess = true;
 
           const userStr = localStorage.getItem('user');
@@ -229,7 +233,7 @@ const ManageBusiness = () => {
               ...user,
               companyName: profileResult.user.companyName,
               email: profileResult.user.email,
-              number: profileResult.user.number,
+              number: String(profileResult.user.number),
               image: profileResult.user.image,
             };
             localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -238,14 +242,14 @@ const ManageBusiness = () => {
           setOriginalData({
             companyName: profileResult.user.companyName,
             email: profileResult.user.email,
-            number: profileResult.user.number,
+            number: String(profileResult.user.number),
             image: profileResult.user.image,
           });
 
           setFormData({
             companyName: profileResult.user.companyName,
             email: profileResult.user.email,
-            number: profileResult.user.number,
+            number: String(profileResult.user.number),
             image: profileResult.user.image,
           });
 
@@ -262,21 +266,15 @@ const ManageBusiness = () => {
       }
 
       if (hasPasswordUpdate) {
-        const passwordResponse = await fetch(`${API_URL}/api/user/change-own-password`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            newPassword: passwordData.newPassword,
-            confirmPassword: passwordData.confirmPassword
-          }),
+        const { data: passwordResult } = await api.put<{
+          success: boolean;
+          message?: string;
+        }>('/api/user/change-own-password', {
+          newPassword: passwordData.newPassword,
+          confirmPassword: passwordData.confirmPassword
         });
 
-        const passwordResult = await passwordResponse.json();
-
-        if (passwordResponse.ok && passwordResult.success) {
+        if (passwordResult.success) {
           passwordUpdateSuccess = true;
           setPasswordData({ newPassword: '', confirmPassword: '' });
         } else {
@@ -304,7 +302,11 @@ const ManageBusiness = () => {
       setTimeout(() => setSuccess(''), 5000);
 
     } catch (err) {
-      setError('Network error. Please try again.');
+      if (axios.isAxiosError(err) && err.response?.data && typeof err.response.data === 'object' && 'message' in err.response.data) {
+        setError(String((err.response.data as { message?: string }).message));
+      } else {
+        setError('Network error. Please try again.');
+      }
       console.error('Update error:', err);
     } finally {
       setLoading(false);

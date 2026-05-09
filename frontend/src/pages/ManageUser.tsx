@@ -7,12 +7,12 @@ import { UserRole } from '../constants/Roles';
 import { useUserManagement } from '../hooks/useUserManagement';
 import { D } from '../theme/tokens';
 import { Spinner } from '../components/ui/Spinner';
-import { StatusBadge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { ModalOverlay, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
 import { FInput, FLabel, FSelect } from '../components/ui/FormField';
-import { PrimaryBtn, GhostBtn, ActionBtn } from '../components/ui/Button';
+import { PrimaryBtn, GhostBtn, ActionBtn } from '../components/ui/ActionButton';
 import { InlineAlert } from '../components/ui/Alert';
-import { Avatar } from '../components/ui/Avatar';
+import { Avatar } from '../components/ui/UserAvatar';
 import { Paginator } from '../components/ui/Paginator';
 import { PageHeader } from '../components/ui/PageHeader';
 

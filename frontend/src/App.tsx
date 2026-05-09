@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 import Login from './pages/Login';
 import DashboardLayout from './components/layout/DashboardLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -24,6 +26,8 @@ const wrapped = (Page: React.ComponentType) => (
 
 function App() {
   return (
+    <TooltipProvider>
+    <Toaster position="top-right" richColors theme="dark" />
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
@@ -43,6 +47,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </TooltipProvider>
   );
 }
 

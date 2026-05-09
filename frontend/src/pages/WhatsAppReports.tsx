@@ -6,7 +6,7 @@ import { useCampaigns, type Campaign } from '../hooks/useCampaigns';
 import { api } from '../api/client';
 import { D } from '../theme/tokens';
 import { Spinner } from '../components/ui/Spinner';
-import { StatusBadge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { Paginator } from '../components/ui/Paginator';
 import { PageHeader } from '../components/ui/PageHeader';
 

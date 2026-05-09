@@ -13,7 +13,7 @@ import { UserRole } from '../constants/Roles';
 import { useDashboard } from '../hooks/useDashboard';
 import { D } from '../theme/tokens';
 import { Spinner } from '../components/ui/Spinner';
-import { Badge, statusColor } from '../components/ui/Badge';
+import { Badge, statusColor } from '../components/ui/StatusBadge';
 
 const CustomTooltip = ({ active, payload }: {
   active?: boolean;
